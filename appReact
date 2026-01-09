@@ -1,0 +1,563 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Wallet, 
+  TrendingDown, 
+  TrendingUp, 
+  PieChart, 
+  Settings, 
+  Plus, 
+  Trash2, 
+  Calendar, 
+  CreditCard, 
+  X, 
+  LayoutDashboard,
+  Check
+} from 'lucide-react';
+
+// --- Componentes Auxiliares (Adaptados para Web com Tailwind) ---
+
+const Card = ({ children, className = "" }) => (
+  <div className={`bg-white rounded-2xl p-4 shadow-sm border border-slate-100 ${className}`}>
+    {children}
+  </div>
+);
+
+const Button = ({ onClick, children, variant = "primary", className = "" }) => {
+  const variants = {
+    primary: "bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95",
+    danger: "bg-rose-50 text-rose-600 hover:bg-rose-100 active:scale-95",
+    outline: "bg-transparent border border-slate-300 text-slate-600 hover:bg-slate-50",
+  };
+
+  return (
+    <button 
+      onClick={onClick} 
+      className={`py-3.5 rounded-xl font-bold text-center transition-all flex items-center justify-center gap-2 ${variants[variant]} ${className}`}
+    >
+      {children}
+    </button>
+  );
+};
+
+// --- Aplicação Principal ---
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [showAddTransaction, setShowAddTransaction] = useState(false);
+  const [showAddAccount, setShowAddAccount] = useState(false);
+
+  // Estados de Dados
+  const [accounts, setAccounts] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [incomeConfig, setIncomeConfig] = useState({
+    dailyRate: '100',
+    daysPerWeek: '5',
+    manualOverride: false,
+    manualAmount: '3000'
+  });
+
+  // Inputs Temporários
+  const [newTransaction, setNewTransaction] = useState({
+    description: '',
+    amount: '',
+    type: 'expense',
+    category: 'Alimentação',
+    accountId: ''
+  });
+
+  const [newAccount, setNewAccount] = useState({
+    name: '',
+    initialBalance: ''
+  });
+
+  // --- Carregar/Salvar Dados (Persistência via localStorage para Web) ---
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    saveData();
+  }, [accounts, transactions, incomeConfig]);
+
+  const loadData = () => {
+    try {
+      const savedAccounts = localStorage.getItem('fin_accounts');
+      const savedTrans = localStorage.getItem('fin_transactions');
+      const savedConfig = localStorage.getItem('fin_config');
+
+      if (savedAccounts) setAccounts(JSON.parse(savedAccounts));
+      else setAccounts([
+        { id: 1, name: 'Nubank', balance: 1500.00, color: 'bg-purple-600' },
+        { id: 2, name: 'Carteira', balance: 150.00, color: 'bg-emerald-600' }
+      ]);
+
+      if (savedTrans) setTransactions(JSON.parse(savedTrans));
+      if (savedConfig) setIncomeConfig(JSON.parse(savedConfig));
+    } catch (e) {
+      console.error("Erro ao carregar dados", e);
+    }
+  };
+
+  const saveData = () => {
+    try {
+      localStorage.setItem('fin_accounts', JSON.stringify(accounts));
+      localStorage.setItem('fin_transactions', JSON.stringify(transactions));
+      localStorage.setItem('fin_config', JSON.stringify(incomeConfig));
+    } catch (e) {
+      console.error("Erro ao salvar dados", e);
+    }
+  };
+
+  // --- Lógica de Negócio ---
+
+  const estimatedMonthlyIncome = incomeConfig.manualOverride 
+    ? Number(incomeConfig.manualAmount)
+    : Number(incomeConfig.dailyRate) * Number(incomeConfig.daysPerWeek) * 4.33;
+
+  const totalBalance = accounts.reduce((acc, curr) => acc + curr.balance, 0);
+
+  const getExpenses = (period) => {
+    const now = new Date();
+    return transactions.filter(t => {
+      const tDate = new Date(t.date);
+      const isExpense = t.type === 'expense';
+      if (!isExpense) return false;
+
+      if (period === 'today') {
+        return tDate.getDate() === now.getDate() && 
+               tDate.getMonth() === now.getMonth() && 
+               tDate.getFullYear() === now.getFullYear();
+      }
+      if (period === 'month') {
+        return tDate.getMonth() === now.getMonth() && 
+               tDate.getFullYear() === now.getFullYear();
+      }
+      return true;
+    }).reduce((acc, curr) => acc + curr.amount, 0);
+  };
+
+  const expensesMonth = getExpenses('month');
+  const expensesToday = getExpenses('today');
+  
+  const remainingBudget = estimatedMonthlyIncome - expensesMonth;
+  const budgetPercentage = Math.min(100, Math.max(0, (expensesMonth / estimatedMonthlyIncome) * 100));
+
+  const categoryData = transactions
+  .filter(t => t.type === 'expense' && new Date(t.date).getMonth() === new Date().getMonth())
+  .reduce((acc, curr) => {
+    acc[curr.category] = (acc[curr.category] || 0) + curr.amount;
+    return acc;
+  }, {});
+
+  // --- Funções de Ação ---
+
+  const handleAddTransaction = () => {
+    if (!newTransaction.description || !newTransaction.amount || !newTransaction.accountId) {
+      alert("Erro: Preencha todos os campos!");
+      return;
+    }
+
+    const amount = Number(newTransaction.amount.replace(',', '.'));
+    const selectedAccount = accounts.find(a => a.id === Number(newTransaction.accountId));
+
+    const updatedAccounts = accounts.map(acc => {
+      if (acc.id === Number(newTransaction.accountId)) {
+        return {
+          ...acc,
+          balance: newTransaction.type === 'income' ? acc.balance + amount : acc.balance - amount
+        };
+      }
+      return acc;
+    });
+
+    const transactionRecord = {
+      id: Date.now(),
+      ...newTransaction,
+      amount: amount,
+      accountName: selectedAccount.name,
+      date: new Date().toISOString()
+    };
+
+    setAccounts(updatedAccounts);
+    setTransactions([transactionRecord, ...transactions]);
+    setShowAddTransaction(false);
+    setNewTransaction({ description: '', amount: '', type: 'expense', category: 'Alimentação', accountId: '' });
+  };
+
+  const handleAddAccount = () => {
+    if (!newAccount.name || !newAccount.initialBalance) return;
+    setAccounts([...accounts, {
+      id: Date.now(),
+      name: newAccount.name,
+      balance: Number(newAccount.initialBalance.replace(',', '.')),
+      color: 'bg-slate-600'
+    }]);
+    setNewAccount({ name: '', initialBalance: '' });
+    setShowAddAccount(false);
+  };
+
+  const deleteAccount = (id) => {
+    if(window.confirm("Tem a certeza? O saldo será removido do total.")) {
+        setAccounts(accounts.filter(a => a.id !== id));
+    }
+  };
+
+  const formatCurrency = (val) => {
+    return 'R$ ' + val.toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+  };
+
+  // --- Renderização UI (Simulação Mobile) ---
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-24 flex justify-center">
+      {/* Container Mobile */}
+      <div className="w-full max-w-md bg-slate-50 min-h-screen shadow-2xl relative overflow-hidden">
+        
+        {/* StatusBar Fake */}
+        <div className="h-6 bg-indigo-600 w-full"></div>
+
+        {/* Header Fixo */}
+        <div className="bg-indigo-600 pt-5 pb-8 px-6 rounded-b-[2rem] shadow-lg shadow-indigo-200">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <p className="text-indigo-200 text-sm font-medium">Saldo Total Acumulado</p>
+              <h1 className="text-3xl font-bold text-white">{formatCurrency(totalBalance)}</h1>
+            </div>
+            <div className="bg-white/20 p-2.5 rounded-full">
+              <Wallet className="text-white w-6 h-6" />
+            </div>
+          </div>
+
+          {/* Resumo Horizontal */}
+          <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-xl min-w-[120px]">
+              <div className="flex items-center gap-1 mb-1">
+                <Calendar className="text-indigo-100 w-3.5 h-3.5" />
+                <p className="text-xs text-indigo-100">Hoje</p>
+              </div>
+              <p className="text-white font-bold text-lg">{formatCurrency(expensesToday)}</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-xl min-w-[120px]">
+              <div className="flex items-center gap-1 mb-1">
+                <TrendingDown className="text-indigo-100 w-3.5 h-3.5" />
+                <p className="text-xs text-indigo-100">Mês</p>
+              </div>
+              <p className="text-white font-bold text-lg">{formatCurrency(expensesMonth)}</p>
+            </div>
+            <div className="bg-emerald-500/20 backdrop-blur-md border border-emerald-400/30 p-3 rounded-xl min-w-[120px]">
+              <div className="flex items-center gap-1 mb-1">
+                <TrendingUp className="text-emerald-100 w-3.5 h-3.5" />
+                <p className="text-xs text-emerald-100">Lucro</p>
+              </div>
+              <p className="text-emerald-50 font-bold text-lg">{formatCurrency(remainingBudget)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5 pb-24 space-y-5 overflow-y-auto h-[calc(100vh-220px)]">
+          
+          {/* --- DASHBOARD TAB --- */}
+          {activeTab === 'dashboard' && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-4">
+              
+              {/* Barra de Progresso */}
+              <Card>
+                <div className="flex justify-between items-end mb-3">
+                  <h3 className="font-bold text-slate-700">Fluxo Mensal</h3>
+                  <span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md">
+                    {Math.round(budgetPercentage)}% gasto
+                  </span>
+                </div>
+                <div className="h-3 bg-slate-100 rounded-full overflow-hidden mb-3">
+                  <div className="h-full bg-rose-500 transition-all duration-1000" style={{ width: `${budgetPercentage}%` }} />
+                </div>
+                <div className="flex justify-between text-xs text-slate-400 font-medium">
+                  <span>Gasto: {formatCurrency(expensesMonth)}</span>
+                  <span>Meta: {formatCurrency(estimatedMonthlyIncome)}</span>
+                </div>
+              </Card>
+
+              {/* Botões de Ação Rápida */}
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => { setNewTransaction({...newTransaction, type: 'expense'}); setShowAddTransaction(true); }}
+                  className="flex-1 bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center gap-2 active:scale-95 transition-transform"
+                >
+                  <div className="bg-rose-100 p-2.5 rounded-full text-rose-600">
+                    <TrendingDown className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-slate-600 text-sm">Nova Despesa</span>
+                </button>
+                <button 
+                  onClick={() => { setNewTransaction({...newTransaction, type: 'income'}); setShowAddTransaction(true); }}
+                  className="flex-1 bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center gap-2 active:scale-95 transition-transform"
+                >
+                  <div className="bg-emerald-100 p-2.5 rounded-full text-emerald-600">
+                    <TrendingUp className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-slate-600 text-sm">Nova Receita</span>
+                </button>
+              </div>
+
+              {/* Lista de Categorias */}
+              <Card>
+                <div className="flex items-center gap-2 mb-4">
+                  <PieChart className="w-4 h-4 text-indigo-500"/>
+                  <h3 className="font-bold text-slate-700">Por Categoria</h3>
+                </div>
+                {Object.keys(categoryData).length === 0 ? (
+                  <p className="text-center text-slate-400 text-sm py-2">Sem gastos registados.</p>
+                ) : (
+                  Object.entries(categoryData).map(([cat, amount], idx) => (
+                    <div key={cat} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2.5 h-2.5 rounded-full ${['bg-orange-400','bg-blue-400','bg-pink-400','bg-purple-400'][idx % 4]}`}></div>
+                        <span className="text-slate-600 text-sm">{cat}</span>
+                      </div>
+                      <span className="font-bold text-slate-700 text-sm">{formatCurrency(amount)}</span>
+                    </div>
+                  ))
+                )}
+              </Card>
+
+              {/* Últimas Transações */}
+              <h3 className="font-bold text-slate-700 text-lg">Últimas Transações</h3>
+              {transactions.slice(0, 5).map(t => (
+                <div key={t.id} className="bg-white p-3 rounded-xl flex justify-between items-center shadow-sm border border-slate-50">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${t.type === 'expense' ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                      {t.type === 'expense' ? <TrendingDown size={18} /> : <TrendingUp size={18} />}
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm text-slate-800">{t.description}</p>
+                      <p className="text-xs text-slate-400">{t.category} • {t.accountName}</p>
+                    </div>
+                  </div>
+                  <span className={`font-bold text-sm ${t.type === 'expense' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                    {t.type === 'expense' ? '-' : '+'} {formatCurrency(t.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* --- CARTEIRA TAB --- */}
+          {activeTab === 'wallet' && (
+            <div className="animate-in fade-in slide-in-from-right-8 space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold text-slate-800">Minhas Contas</h2>
+                <button onClick={() => setShowAddAccount(true)} className="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-1">
+                  <Plus size={16} /> Adicionar
+                </button>
+              </div>
+
+              {accounts.map(acc => (
+                <div key={acc.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group">
+                  <div className={`absolute -top-2 -right-2 w-20 h-20 rounded-full opacity-10 ${acc.color}`}></div>
+                  <div className="relative z-10">
+                    <p className="text-slate-500 text-sm font-medium mb-1">{acc.name}</p>
+                    <h3 className="text-2xl font-bold text-slate-800">{formatCurrency(acc.balance)}</h3>
+                    <button onClick={() => deleteAccount(acc.id)} className="absolute bottom-0 right-0 p-2 text-slate-300 hover:text-rose-500">
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* --- CONFIGURAÇÕES TAB --- */}
+          {activeTab === 'settings' && (
+            <div className="animate-in fade-in slide-in-from-right-8 space-y-4">
+              <h2 className="text-xl font-bold text-slate-800">Ajustes de Renda</h2>
+              <Card>
+                <p className="text-xs text-slate-400 mb-4">Defina como recebe para calcularmos o seu lucro.</p>
+                
+                <div className="flex bg-slate-100 p-1 rounded-lg mb-4">
+                  <button 
+                    onClick={() => setIncomeConfig({...incomeConfig, manualOverride: false})}
+                    className={`flex-1 text-xs py-2 rounded-md font-bold transition-all ${!incomeConfig.manualOverride ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`}
+                  >
+                    Por Dia
+                  </button>
+                  <button 
+                    onClick={() => setIncomeConfig({...incomeConfig, manualOverride: true})}
+                    className={`flex-1 text-xs py-2 rounded-md font-bold transition-all ${incomeConfig.manualOverride ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`}
+                  >
+                    Fixo Mensal
+                  </button>
+                </div>
+
+                {!incomeConfig.manualOverride ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500">Valor por Dia (R$)</label>
+                      <input 
+                        type="number"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 mt-1 outline-none focus:border-indigo-500"
+                        value={incomeConfig.dailyRate}
+                        onChange={(e) => setIncomeConfig({...incomeConfig, dailyRate: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500">Dias por Semana</label>
+                      <input 
+                        type="number"
+                        maxLength="1"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 mt-1 outline-none focus:border-indigo-500"
+                        value={incomeConfig.daysPerWeek}
+                        onChange={(e) => setIncomeConfig({...incomeConfig, daysPerWeek: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-xs font-bold text-slate-500">Salário Mensal (R$)</label>
+                    <input 
+                      type="number"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 mt-1 outline-none focus:border-indigo-500"
+                      value={incomeConfig.manualAmount}
+                      onChange={(e) => setIncomeConfig({...incomeConfig, manualAmount: e.target.value})}
+                    />
+                  </div>
+                )}
+
+                <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
+                  <span className="font-bold text-slate-600">Renda Estimada:</span>
+                  <span className="font-bold text-emerald-600">{formatCurrency(estimatedMonthlyIncome)}</span>
+                </div>
+              </Card>
+            </div>
+          )}
+
+        </div>
+
+        {/* --- TAB BAR INFERIOR --- */}
+        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-100 h-20 flex justify-around items-start pt-3 px-2 z-40">
+          <button onClick={() => setActiveTab('dashboard')} className="flex flex-col items-center w-16">
+            <LayoutDashboard size={24} className={activeTab === 'dashboard' ? 'text-indigo-600' : 'text-slate-300'} strokeWidth={activeTab === 'dashboard' ? 2.5 : 2} />
+            <span className={`text-[10px] font-bold mt-1 ${activeTab === 'dashboard' ? 'text-indigo-600' : 'text-slate-300'}`}>Início</span>
+          </button>
+
+          <button 
+            onClick={() => { setNewTransaction({...newTransaction, type: 'expense'}); setShowAddTransaction(true); }}
+            className="bg-indigo-600 text-white rounded-full w-14 h-14 flex items-center justify-center -mt-8 shadow-lg shadow-indigo-200 border-4 border-slate-50"
+          >
+            <Plus size={28} />
+          </button>
+
+          <button onClick={() => setActiveTab('wallet')} className="flex flex-col items-center w-16">
+            <CreditCard size={24} className={activeTab === 'wallet' ? 'text-indigo-600' : 'text-slate-300'} strokeWidth={activeTab === 'wallet' ? 2.5 : 2} />
+            <span className={`text-[10px] font-bold mt-1 ${activeTab === 'wallet' ? 'text-indigo-600' : 'text-slate-300'}`}>Contas</span>
+          </button>
+
+          <button onClick={() => setActiveTab('settings')} className="flex flex-col items-center w-16">
+            <Settings size={24} className={activeTab === 'settings' ? 'text-indigo-600' : 'text-slate-300'} strokeWidth={activeTab === 'settings' ? 2.5 : 2} />
+            <span className={`text-[10px] font-bold mt-1 ${activeTab === 'settings' ? 'text-indigo-600' : 'text-slate-300'}`}>Ajustes</span>
+          </button>
+        </div>
+
+        {/* --- MODAL NOVA TRANSAÇÃO --- */}
+        {showAddTransaction && (
+          <div className="absolute inset-0 z-50 bg-black/50 flex items-end">
+            <div className="bg-white w-full rounded-t-[2rem] p-6 animate-in slide-in-from-bottom-full duration-300">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-lg text-slate-800">
+                  {newTransaction.type === 'expense' ? 'Nova Despesa' : 'Nova Receita'}
+                </h3>
+                <button onClick={() => setShowAddTransaction(false)}><X className="text-slate-400" /></button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 ml-1">Valor (R$)</label>
+                  <input 
+                    type="number" 
+                    placeholder="0,00"
+                    autoFocus
+                    className="w-full text-center text-3xl font-bold text-slate-800 bg-transparent border-b-2 border-slate-100 pb-2 outline-none focus:border-indigo-500"
+                    value={newTransaction.amount}
+                    onChange={(e) => setNewTransaction({...newTransaction, amount: e.target.value})}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-500 ml-1">Descrição</label>
+                  <input 
+                    type="text" 
+                    className="w-full bg-slate-50 p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-100"
+                    placeholder="Ex: Almoço"
+                    value={newTransaction.description}
+                    onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-xs font-bold text-slate-500 ml-1">Categoria</label>
+                    <select 
+                      className="w-full bg-slate-50 p-3 rounded-xl outline-none"
+                      value={newTransaction.category}
+                      onChange={(e) => setNewTransaction({...newTransaction, category: e.target.value})}
+                    >
+                      <option>Alimentação</option>
+                      <option>Transporte</option>
+                      <option>Lazer</option>
+                      <option>Moradia</option>
+                      <option>Saúde</option>
+                      <option>Outros</option>
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs font-bold text-slate-500 ml-1">Conta</label>
+                    <select 
+                      className="w-full bg-slate-50 p-3 rounded-xl outline-none"
+                      value={newTransaction.accountId}
+                      onChange={(e) => setNewTransaction({...newTransaction, accountId: e.target.value})}
+                    >
+                      <option value="">Escolha...</option>
+                      {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <Button onClick={handleAddTransaction} className="w-full mt-4">Confirmar</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- MODAL NOVA CONTA --- */}
+        {showAddAccount && (
+          <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-sm rounded-2xl p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg text-slate-800">Adicionar Conta</h3>
+                <button onClick={() => setShowAddAccount(false)}><X className="text-slate-400" /></button>
+              </div>
+              
+              <div className="space-y-3">
+                <input 
+                  type="text" 
+                  placeholder="Nome (Ex: Nubank)"
+                  className="w-full bg-slate-50 p-3 rounded-xl outline-none border border-slate-100 focus:border-indigo-500"
+                  value={newAccount.name}
+                  onChange={(e) => setNewAccount({...newAccount, name: e.target.value})}
+                />
+                <input 
+                  type="number" 
+                  placeholder="Saldo Inicial (R$)"
+                  className="w-full bg-slate-50 p-3 rounded-xl outline-none border border-slate-100 focus:border-indigo-500"
+                  value={newAccount.initialBalance}
+                  onChange={(e) => setNewAccount({...newAccount, initialBalance: e.target.value})}
+                />
+                <Button onClick={handleAddAccount} className="w-full">Salvar Conta</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
