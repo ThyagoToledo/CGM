@@ -18,10 +18,22 @@ export default function App() {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [showAddTransaction, setShowAddTransaction] = useState(false);
     const [showAddAccount, setShowAddAccount] = useState(false);
+    const [showEditBalance, setShowEditBalance] = useState(false);
+    const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+    const [showAccountPicker, setShowAccountPicker] = useState(false);
+    const [showAddCategory, setShowAddCategory] = useState(false);
 
     // Estados de Dados
     const [accounts, setAccounts] = useState([]);
     const [transactions, setTransactions] = useState([]);
+    const [categories, setCategories] = useState([
+        'Alimentação',
+        'Transporte',
+        'Lazer',
+        'Moradia',
+        'Saúde',
+        'Outros'
+    ]);
     const [incomeConfig, setIncomeConfig] = useState({
         dailyRate: 100,
         daysPerWeek: 5,
@@ -42,6 +54,10 @@ export default function App() {
         name: '',
         initialBalance: ''
     });
+
+    const [editingAccount, setEditingAccount] = useState(null);
+    const [newBalance, setNewBalance] = useState('');
+    const [newCategory, setNewCategory] = useState('');
 
     // --- Inicializar Banco de Dados ---
     useEffect(() => {
@@ -179,6 +195,48 @@ export default function App() {
         Alert.alert("Sucesso", "Configurações guardadas!");
     };
 
+    const handleEditBalance = async () => {
+        if (!newBalance || !editingAccount) return;
+
+        const balance = Number(newBalance.replace(',', '.'));
+        await DB.updateAccountBalance(editingAccount.id, balance);
+        await loadData();
+        setShowEditBalance(false);
+        setEditingAccount(null);
+        setNewBalance('');
+    };
+
+    const handleAddCategory = () => {
+        if (!newCategory.trim()) {
+            Alert.alert("Erro", "Digite o nome da categoria!");
+            return;
+        }
+        if (categories.includes(newCategory)) {
+            Alert.alert("Erro", "Esta categoria já existe!");
+            return;
+        }
+        setCategories([...categories, newCategory]);
+        setNewCategory('');
+        setShowAddCategory(false);
+    };
+
+    const handleDeleteCategory = (category) => {
+        Alert.alert(
+            "Confirmar",
+            `Eliminar categoria "${category}"?`,
+            [
+                { text: "Cancelar", style: "cancel" },
+                {
+                    text: "Eliminar",
+                    style: "destructive",
+                    onPress: () => {
+                        setCategories(categories.filter(c => c !== category));
+                    }
+                }
+            ]
+        );
+    };
+
     const formatCurrency = (val) => {
         return 'R$ ' + val.toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
     };
@@ -294,27 +352,47 @@ export default function App() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Categorias */}
+                        {/* Gráfico Circular de Categorias */}
                         <View style={styles.card}>
                             <View style={styles.cardHeader}>
                                 <Ionicons name="pie-chart-outline" size={16} color="#6366F1" />
-                                <Text style={styles.cardTitle}>Por Categoria</Text>
+                                <Text style={styles.cardTitle}>Gastos por Categoria</Text>
                             </View>
                             {Object.keys(categoryData).length === 0 ? (
                                 <Text style={styles.emptyText}>Sem gastos registados.</Text>
                             ) : (
-                                Object.entries(categoryData).map(([cat, amount], idx) => (
-                                    <View key={cat} style={styles.categoryRow}>
-                                        <View style={styles.categoryLeft}>
-                                            <View style={[
-                                                styles.categoryDot,
-                                                { backgroundColor: ['#FB923C', '#60A5FA', '#EC4899', '#A78BFA'][idx % 4] }
-                                            ]} />
-                                            <Text style={styles.categoryName}>{cat}</Text>
+                                <>
+                                    {/* Gráfico Circular */}
+                                    <View style={styles.chartContainer}>
+                                        <View style={styles.circularChart}>
+                                            <Text style={styles.chartCenterValue}>{formatCurrency(expensesMonth)}</Text>
+                                            <Text style={styles.chartCenterLabel}>Total gasto</Text>
                                         </View>
-                                        <Text style={styles.categoryAmount}>{formatCurrency(amount)}</Text>
                                     </View>
-                                ))
+
+                                    {/* Lista de Categorias com Percentuais */}
+                                    {Object.entries(categoryData)
+                                        .sort((a, b) => b[1] - a[1])
+                                        .map(([cat, amount], idx) => {
+                                            const percentage = ((amount / expensesMonth) * 100).toFixed(1);
+                                            const colors = ['#10B981', '#6366F1', '#F59E0B', '#EC4899', '#8B5CF6', '#64748B'];
+                                            return (
+                                                <View key={cat} style={styles.categoryRow}>
+                                                    <View style={styles.categoryLeft}>
+                                                        <View style={[
+                                                            styles.categoryDot,
+                                                            { backgroundColor: colors[idx % colors.length] }
+                                                        ]} />
+                                                        <Text style={styles.categoryName}>{cat}</Text>
+                                                    </View>
+                                                    <View style={styles.categoryRight}>
+                                                        <Text style={styles.categoryAmount}>{formatCurrency(amount)}</Text>
+                                                        <Text style={styles.categoryPercentage}>{percentage}%</Text>
+                                                    </View>
+                                                </View>
+                                            );
+                                        })}
+                                </>
                             )}
                         </View>
 
@@ -367,12 +445,64 @@ export default function App() {
 
                         {accounts.map(acc => (
                             <View key={acc.id} style={styles.accountCard}>
-                                <View>
+                                <View style={{ flex: 1 }}>
                                     <Text style={styles.accountName}>{acc.name}</Text>
                                     <Text style={styles.accountBalance}>{formatCurrency(acc.balance)}</Text>
                                 </View>
-                                <TouchableOpacity onPress={() => deleteAccountHandler(acc.id)}>
-                                    <Ionicons name="trash-outline" size={20} color="#CBD5E1" />
+                                <View style={styles.accountActions}>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setEditingAccount(acc);
+                                            setNewBalance(String(acc.balance));
+                                            setShowEditBalance(true);
+                                        }}
+                                        style={styles.iconButton}
+                                    >
+                                        <Ionicons name="create-outline" size={20} color="#6366F1" />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={() => deleteAccountHandler(acc.id)}
+                                        style={styles.iconButton}
+                                    >
+                                        <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                )}
+
+                {/* CATEGORIAS TAB */}
+                {activeTab === 'categories' && (
+                    <View style={styles.tabContent}>
+                        <View style={styles.tabHeader}>
+                            <Text style={styles.tabHeaderTitle}>Categorias</Text>
+                            <TouchableOpacity
+                                style={styles.addButton}
+                                onPress={() => setShowAddCategory(true)}
+                            >
+                                <Ionicons name="add" size={16} color="#4F46E5" />
+                                <Text style={styles.addButtonText}>Adicionar</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {categories.map((cat, idx) => (
+                            <View key={cat} style={styles.categoryCard}>
+                                <View style={styles.categoryCardLeft}>
+                                    <View style={[
+                                        styles.categoryCardIcon,
+                                        { backgroundColor: ['#10B981', '#6366F1', '#F59E0B', '#EC4899', '#8B5CF6', '#64748B'][idx % 6] + '20' }
+                                    ]}>
+                                        <Ionicons
+                                            name="pricetag"
+                                            size={20}
+                                            color={['#10B981', '#6366F1', '#F59E0B', '#EC4899', '#8B5CF6', '#64748B'][idx % 6]}
+                                        />
+                                    </View>
+                                    <Text style={styles.categoryCardName}>{cat}</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => handleDeleteCategory(cat)}>
+                                    <Ionicons name="trash-outline" size={20} color="#EF4444" />
                                 </TouchableOpacity>
                             </View>
                         ))}
@@ -473,6 +603,20 @@ export default function App() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
+                    style={styles.tab}
+                    onPress={() => setActiveTab('wallet')}
+                >
+                    <Ionicons
+                        name={activeTab === 'wallet' ? 'card' : 'card-outline'}
+                        size={24}
+                        color={activeTab === 'wallet' ? '#4F46E5' : '#CBD5E1'}
+                    />
+                    <Text style={[styles.tabText, activeTab === 'wallet' && styles.tabTextActive]}>
+                        Contas
+                    </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
                     style={styles.tabCenter}
                     onPress={() => {
                         setNewTransaction({ ...newTransaction, type: 'expense' });
@@ -484,15 +628,15 @@ export default function App() {
 
                 <TouchableOpacity
                     style={styles.tab}
-                    onPress={() => setActiveTab('wallet')}
+                    onPress={() => setActiveTab('categories')}
                 >
                     <Ionicons
-                        name={activeTab === 'wallet' ? 'card' : 'card-outline'}
+                        name={activeTab === 'categories' ? 'pricetag' : 'pricetag-outline'}
                         size={24}
-                        color={activeTab === 'wallet' ? '#4F46E5' : '#CBD5E1'}
+                        color={activeTab === 'categories' ? '#4F46E5' : '#CBD5E1'}
                     />
-                    <Text style={[styles.tabText, activeTab === 'wallet' && styles.tabTextActive]}>
-                        Contas
+                    <Text style={[styles.tabText, activeTab === 'categories' && styles.tabTextActive]}>
+                        Categorias
                     </Text>
                 </TouchableOpacity>
 
@@ -551,26 +695,31 @@ export default function App() {
                         <View style={styles.inputRow}>
                             <View style={styles.inputHalf}>
                                 <Text style={styles.inputLabel}>Categoria</Text>
-                                <View style={styles.picker}>
-                                    <TextInput
-                                        style={styles.pickerText}
-                                        value={newTransaction.category}
-                                        onChangeText={(val) => setNewTransaction({ ...newTransaction, category: val })}
-                                    />
-                                </View>
+                                <TouchableOpacity
+                                    style={styles.pickerButton}
+                                    onPress={() => setShowCategoryPicker(true)}
+                                >
+                                    <Text style={styles.pickerButtonText}>
+                                        {newTransaction.category || 'Selecionar'}
+                                    </Text>
+                                    <Ionicons name="chevron-down" size={20} color="#64748B" />
+                                </TouchableOpacity>
                             </View>
 
                             <View style={styles.inputHalf}>
                                 <Text style={styles.inputLabel}>Conta</Text>
-                                <View style={styles.picker}>
-                                    <TextInput
-                                        style={styles.pickerText}
-                                        placeholder="ID da conta"
-                                        keyboardType="numeric"
-                                        value={newTransaction.accountId}
-                                        onChangeText={(val) => setNewTransaction({ ...newTransaction, accountId: val })}
-                                    />
-                                </View>
+                                <TouchableOpacity
+                                    style={styles.pickerButton}
+                                    onPress={() => setShowAccountPicker(true)}
+                                >
+                                    <Text style={styles.pickerButtonText}>
+                                        {newTransaction.accountId
+                                            ? accounts.find(a => a.id === Number(newTransaction.accountId))?.name || 'Selecionar'
+                                            : 'Selecionar'
+                                        }
+                                    </Text>
+                                    <Ionicons name="chevron-down" size={20} color="#64748B" />
+                                </TouchableOpacity>
                             </View>
                         </View>
 
@@ -620,6 +769,152 @@ export default function App() {
 
                         <TouchableOpacity style={styles.confirmButton} onPress={handleAddAccount}>
                             <Text style={styles.confirmButtonText}>Salvar Conta</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal Picker de Categorias */}
+            <Modal
+                visible={showCategoryPicker}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowCategoryPicker(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.pickerModal}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Selecionar Categoria</Text>
+                            <TouchableOpacity onPress={() => setShowCategoryPicker(false)}>
+                                <Ionicons name="close" size={24} color="#94A3B8" />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={{ maxHeight: 400 }}>
+                            {categories.map((cat) => (
+                                <TouchableOpacity
+                                    key={cat}
+                                    style={styles.pickerItem}
+                                    onPress={() => {
+                                        setNewTransaction({ ...newTransaction, category: cat });
+                                        setShowCategoryPicker(false);
+                                    }}
+                                >
+                                    <Text style={styles.pickerItemText}>{cat}</Text>
+                                    {newTransaction.category === cat && (
+                                        <Ionicons name="checkmark" size={24} color="#4F46E5" />
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal Picker de Contas */}
+            <Modal
+                visible={showAccountPicker}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowAccountPicker(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.pickerModal}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Selecionar Conta</Text>
+                            <TouchableOpacity onPress={() => setShowAccountPicker(false)}>
+                                <Ionicons name="close" size={24} color="#94A3B8" />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={{ maxHeight: 400 }}>
+                            {accounts.map((acc) => (
+                                <TouchableOpacity
+                                    key={acc.id}
+                                    style={styles.pickerItem}
+                                    onPress={() => {
+                                        setNewTransaction({ ...newTransaction, accountId: String(acc.id) });
+                                        setShowAccountPicker(false);
+                                    }}
+                                >
+                                    <View>
+                                        <Text style={styles.pickerItemText}>{acc.name}</Text>
+                                        <Text style={styles.pickerItemSubtext}>{formatCurrency(acc.balance)}</Text>
+                                    </View>
+                                    {String(newTransaction.accountId) === String(acc.id) && (
+                                        <Ionicons name="checkmark" size={24} color="#4F46E5" />
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal Editar Saldo */}
+            <Modal
+                visible={showEditBalance}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setShowEditBalance(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { maxHeight: 300 }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Editar Saldo</Text>
+                            <TouchableOpacity onPress={() => setShowEditBalance(false)}>
+                                <Ionicons name="close" size={24} color="#94A3B8" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.inputLabel}>Conta: {editingAccount?.name}</Text>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Novo Saldo (R$)</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="0,00"
+                                keyboardType="decimal-pad"
+                                value={newBalance}
+                                onChangeText={setNewBalance}
+                                autoFocus
+                            />
+                        </View>
+
+                        <TouchableOpacity style={styles.confirmButton} onPress={handleEditBalance}>
+                            <Text style={styles.confirmButtonText}>Salvar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal Adicionar Categoria */}
+            <Modal
+                visible={showAddCategory}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setShowAddCategory(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { maxHeight: 300 }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Nova Categoria</Text>
+                            <TouchableOpacity onPress={() => setShowAddCategory(false)}>
+                                <Ionicons name="close" size={24} color="#94A3B8" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Nome da Categoria</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Ex: Educação"
+                                value={newCategory}
+                                onChangeText={setNewCategory}
+                                autoFocus
+                            />
+                        </View>
+
+                        <TouchableOpacity style={styles.confirmButton} onPress={handleAddCategory}>
+                            <Text style={styles.confirmButtonText}>Adicionar</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -822,6 +1117,16 @@ const styles = StyleSheet.create({
         color: '#334155',
         fontSize: 14,
     },
+    chartCenterValue: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#1E293B',
+    },
+    chartCenterLabel: {
+        fontSize: 12,
+        color: '#64748B',
+        marginTop: 4,
+    },
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
@@ -902,6 +1207,23 @@ const styles = StyleSheet.create({
         color: '#4F46E5',
         fontSize: 14,
         fontWeight: 'bold',
+    },
+    categoryCardLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    categoryCardIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    categoryCardName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1E293B',
     },
     accountCard: {
         backgroundColor: '#FFF',
@@ -1113,5 +1435,90 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    pickerModal: {
+        backgroundColor: '#FFF',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 20,
+        minHeight: 300,
+        maxHeight: '80%',
+    },
+    pickerItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    pickerItemText: {
+        fontSize: 16,
+        color: '#1E293B',
+        fontWeight: '500',
+    },
+    pickerItemSubtext: {
+        fontSize: 14,
+        color: '#64748B',
+        marginTop: 4,
+    },
+    pickerButton: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 16,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    pickerButtonText: {
+        fontSize: 16,
+        color: '#1E293B',
+    },
+    pickerButtonPlaceholder: {
+        fontSize: 16,
+        color: '#94A3B8',
+    },
+    categoryCard: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 12,
+    },
+    categoryLeft: {
+        flex: 1,
+    },
+    categoryRight: {
+        alignItems: 'flex-end',
+    },
+    categoryName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1E293B',
+    },
+    categoryPercentage: {
+        fontSize: 14,
+        color: '#64748B',
+        marginTop: 4,
+    },
+    iconButton: {
+        padding: 8,
+    },
+    accountActions: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    chartContainer: {
+        alignItems: 'center',
+        marginVertical: 20,
+    },
+    circularChart: {
+        borderRadius: 999,
+        padding: 20,
     },
 });
