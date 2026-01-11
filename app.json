@@ -23,11 +23,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#4F46E5"
       },
-      "package": "com.financias.app",
-      "permissions": [
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
-      ]
+      "package": "com.financias.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -41,14 +37,7 @@
       "policy": "sdkVersion"
     },
     "plugins": [
-      "expo-sqlite",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#4F46E5"
-        }
-      ]
+      "expo-sqlite"
     ],
     "extra": {
       "eas": {
