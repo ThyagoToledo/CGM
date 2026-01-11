@@ -13,6 +13,7 @@
     "expo": "~54.0.0",
     "expo-asset": "~12.0.12",
     "expo-device": "^8.0.10",
+    "expo-font": "~14.0.10",
     "expo-notifications": "^0.32.16",
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.9",
