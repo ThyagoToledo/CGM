@@ -12,6 +12,7 @@ import {
     SafeAreaView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Updates from 'expo-updates';
 import * as DB from './src/database/database';
 
 export default function App() {
@@ -64,9 +65,40 @@ export default function App() {
         const initialize = async () => {
             await DB.initDatabase();
             await loadData();
+            await checkForUpdates();
         };
         initialize();
     }, []);
+
+    // --- Verificar Atualizações ---
+    const checkForUpdates = async () => {
+        if (!__DEV__) {
+            try {
+                const update = await Updates.checkForUpdateAsync();
+                if (update.isAvailable) {
+                    Alert.alert(
+                        'Atualização Disponível',
+                        'Uma nova versão do app está disponível. Deseja atualizar agora?',
+                        [
+                            {
+                                text: 'Depois',
+                                style: 'cancel'
+                            },
+                            {
+                                text: 'Atualizar',
+                                onPress: async () => {
+                                    await Updates.fetchUpdateAsync();
+                                    await Updates.reloadAsync();
+                                }
+                            }
+                        ]
+                    );
+                }
+            } catch (error) {
+                console.log('Erro ao verificar atualizações:', error);
+            }
+        }
+    };
 
     const loadData = async () => {
         const loadedAccounts = await DB.getAccounts();

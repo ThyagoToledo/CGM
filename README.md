@@ -1,8 +1,16 @@
-# 📱 App Finanças Mobile - React Native
+# App Finanças Mobile - React Native
 
-Aplicativo mobile de gestão financeira pessoal com banco de dados SQLite local.
+![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white)
 
-## 🚀 Como Executar
+Aplicativo mobile de gestão financeira pessoal com banco de dados SQLite local e sistema de atualizações automáticas OTA.
+
+## Download do App
+
+[![Download APK](https://img.shields.io/badge/Download-APK-green?style=for-the-badge&logo=android)](https://expo.dev/accounts/thyag0o/projects/financias-mobile/builds/0f343302-1f2e-4e5f-8a4b-0bb849fb9331)
+
+## Como Executar
 
 ### Pré-requisitos
 - Node.js instalado (v16 ou superior)
@@ -82,22 +90,24 @@ O app usa **SQLite** para armazenamento local persistente:
 - manual_override
 - manual_amount
 
-## 📦 Funcionalidades
+## Funcionalidades
 
-- ✅ Dashboard com resumo financeiro
-- ✅ Adicionar receitas e despesas
-- ✅ Gestão de múltiplas contas
-- ✅ Categorização de gastos
-- ✅ Cálculo automático de lucro mensal
-- ✅ Configuração de renda (por dia ou fixa)
-- ✅ Visualização de transações por categoria
-- ✅ Barra de progresso de gastos mensais
+- Dashboard com resumo financeiro
+- Adicionar receitas e despesas
+- Gestão de múltiplas contas
+- Categorização de gastos
+- Cálculo automático de lucro mensal
+- Configuração de renda (por dia ou fixa)
+- Visualização de transações por categoria
+- Barra de progresso de gastos mensais
+- **Atualizações automáticas OTA** (Over-The-Air)
 
-## 🛠️ Tecnologias
+## Tecnologias
 
 - React Native
 - Expo
 - Expo SQLite (banco de dados local)
+- Expo Updates (atualizações OTA)
 - Ionicons
 
 ## 📂 Estrutura do Projeto
@@ -155,6 +165,19 @@ npm install
 - Verifique se não está em modo de desenvolvimento com hot reload ativo
 - Reinstale o app no dispositivo
 
-## 📝 Licença
+## Atualizações OTA
+
+O app possui sistema de atualizações automáticas Over-The-Air. Quando você publicar uma nova versão:
+
+```bash
+# Publicar atualização
+eas update --branch production --message "Descrição da atualização"
+```
+
+Os usuários receberão um alerta na próxima vez que abrirem o app, perguntando se desejam atualizar.
+
+Para mais detalhes, consulte [ATUALIZACOES.md](ATUALIZACOES.md)
+
+## Licença
 
 Projeto pessoal de estudos.
