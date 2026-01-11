@@ -31,10 +31,11 @@
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/50186f06-b4bd-440d-b995-36b150b320f1"
+      "fallbackToCacheTimeout": 0
     },
-    "runtimeVersion": "1.0.5",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
     "plugins": [
       "expo-sqlite",
       "expo-asset"

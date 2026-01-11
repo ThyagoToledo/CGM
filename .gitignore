@@ -16,3 +16,8 @@ dist/
 
 # Temporary files created by Metro
 .metro-health-check*
+
+android/
+
+android/
+ios/
