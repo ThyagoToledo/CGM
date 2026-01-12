@@ -134,6 +134,9 @@ export default function App() {
             const today = await DB.getExpensesByPeriod('today');
             const categories = await DB.getExpensesByCategory();
 
+            console.log('📊 Categorias carregadas:', categories);
+            console.log('📊 Número de categorias:', Object.keys(categories).length);
+
             setExpensesMonth(month);
             setExpensesToday(today);
             setCategoryData(categories);
@@ -389,6 +392,19 @@ export default function App() {
                             <View style={styles.cardHeader}>
                                 <Ionicons name="pie-chart-outline" size={16} color="#6366F1" />
                                 <Text style={styles.cardTitle}>Gastos por Categoria</Text>
+                                <TouchableOpacity
+                                    onPress={async () => {
+                                        const cats = await DB.getExpensesByCategory();
+                                        const allTrans = await DB.getAllTransactions();
+                                        Alert.alert(
+                                            'Debug Info',
+                                            `Categorias: ${JSON.stringify(cats, null, 2)}\n\nTotal Trans: ${allTrans.length}\n\nExpenses mês: ${expensesMonth}`
+                                        );
+                                    }}
+                                    style={{ marginLeft: 8 }}
+                                >
+                                    <Ionicons name="bug-outline" size={16} color="#6366F1" />
+                                </TouchableOpacity>
                             </View>
                             {Object.keys(categoryData).length === 0 ? (
                                 <Text style={styles.emptyText}>Sem gastos registados.</Text>
@@ -611,6 +627,60 @@ export default function App() {
 
                             <TouchableOpacity style={styles.saveButton} onPress={saveConfig}>
                                 <Text style={styles.saveButtonText}>Guardar Configurações</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Verificar Atualizações */}
+                        <View style={styles.card}>
+                            <View style={styles.cardHeader}>
+                                <Ionicons name="cloud-download-outline" size={16} color="#6366F1" />
+                                <Text style={styles.cardTitle}>Atualizações</Text>
+                            </View>
+                            <Text style={styles.configSubtitle}>Verifique se há atualizações disponíveis para o aplicativo.</Text>
+
+                            <TouchableOpacity
+                                style={styles.updateButton}
+                                onPress={async () => {
+                                    try {
+                                        Alert.alert('Verificando...', 'Procurando atualizações disponíveis.');
+                                        const update = await Updates.checkForUpdateAsync();
+
+                                        if (update.isAvailable) {
+                                            Alert.alert(
+                                                'Atualização Disponível! 🎉',
+                                                'Uma nova versão está disponível. Deseja atualizar agora?',
+                                                [
+                                                    { text: 'Depois', style: 'cancel' },
+                                                    {
+                                                        text: 'Atualizar Agora',
+                                                        onPress: async () => {
+                                                            Alert.alert('Baixando...', 'Aguarde enquanto baixamos a atualização.');
+                                                            await Updates.fetchUpdateAsync();
+                                                            Alert.alert(
+                                                                'Pronto!',
+                                                                'Atualização baixada. O app será reiniciado.',
+                                                                [
+                                                                    {
+                                                                        text: 'Reiniciar',
+                                                                        onPress: () => Updates.reloadAsync()
+                                                                    }
+                                                                ]
+                                                            );
+                                                        }
+                                                    }
+                                                ]
+                                            );
+                                        } else {
+                                            Alert.alert('✅ Tudo Atualizado!', 'Você já está usando a versão mais recente.');
+                                        }
+                                    } catch (error) {
+                                        Alert.alert('Erro', 'Não foi possível verificar atualizações. Verifique sua conexão.');
+                                        console.error('Erro ao verificar atualizações:', error);
+                                    }
+                                }}
+                            >
+                                <Ionicons name="refresh-outline" size={20} color="#fff" />
+                                <Text style={styles.updateButtonText}>Verificar Atualizações</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -1362,6 +1432,21 @@ const styles = StyleSheet.create({
         marginTop: 16,
     },
     saveButtonText: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    updateButton: {
+        backgroundColor: '#10B981',
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 16,
+        flexDirection: 'row',
+        gap: 8,
+    },
+    updateButtonText: {
         color: '#FFF',
         fontSize: 16,
         fontWeight: 'bold',

@@ -227,10 +227,16 @@ export const getExpensesByCategory = async () => {
       ORDER BY total DESC
     `);
 
-        return results.reduce((acc, curr) => {
+        console.log('🔍 Query results from DB:', results);
+
+        const categoryData = results.reduce((acc, curr) => {
             acc[curr.category] = curr.total;
             return acc;
         }, {});
+
+        console.log('🔍 Category data formatted:', categoryData);
+
+        return categoryData;
     } catch (error) {
         console.error('Erro ao buscar gastos por categoria:', error);
         return {};
