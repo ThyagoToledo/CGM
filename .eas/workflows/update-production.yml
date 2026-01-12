@@ -1,13 +1,9 @@
 name: Publish OTA Update
 
 on:
-  workflow_dispatch:
   push:
-    branches: ["main"]
-    paths:
-      - "src/**"
-      - "App.js"
-      - "package.json"
+    branches:
+      - main
 
 jobs:
   update:
@@ -15,4 +11,4 @@ jobs:
     type: update
     params:
       branch: production
-      message: "Atualização automática via workflow"
+      message: Atualização automática via workflow
