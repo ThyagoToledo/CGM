@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -9,11 +9,23 @@ import {
     Alert,
     StyleSheet,
     StatusBar,
-    SafeAreaView
+    SafeAreaView,
+    Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
+import * as Notifications from 'expo-notifications';
 import * as DB from './src/database/database';
+
+// Configurar como as notificações são exibidas quando o app está em foreground
+Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+    }),
+});
 
 export default function App() {
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -23,6 +35,11 @@ export default function App() {
     const [showCategoryPicker, setShowCategoryPicker] = useState(false);
     const [showAccountPicker, setShowAccountPicker] = useState(false);
     const [showAddCategory, setShowAddCategory] = useState(false);
+
+    // Estados de Notificações
+    const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+    const notificationListener = useRef();
+    const responseListener = useRef();
 
     // Estados de Dados
     const [accounts, setAccounts] = useState([]);
@@ -60,14 +77,126 @@ export default function App() {
     const [newBalance, setNewBalance] = useState('');
     const [newCategory, setNewCategory] = useState('');
 
-    // --- Inicializar Banco de Dados ---
+    // --- Configurar Notificações ---
+    const registerForPushNotificationsAsync = async () => {
+        try {
+            // Criar canal de notificação para Android
+            if (Platform.OS === 'android') {
+                await Notifications.setNotificationChannelAsync('financial-alerts', {
+                    name: 'Alertas Financeiros',
+                    importance: Notifications.AndroidImportance.HIGH,
+                    vibrationPattern: [0, 250, 250, 250],
+                    lightColor: '#4F46E5',
+                });
+            }
+
+            // Verificar permissões existentes
+            const { status: existingStatus } = await Notifications.getPermissionsAsync();
+            let finalStatus = existingStatus;
+
+            // Solicitar permissões se necessário
+            if (existingStatus !== 'granted') {
+                const { status } = await Notifications.requestPermissionsAsync();
+                finalStatus = status;
+            }
+
+            if (finalStatus !== 'granted') {
+                console.log('Permissão de notificação negada');
+                return false;
+            }
+
+            setNotificationsEnabled(true);
+            return true;
+        } catch (error) {
+            console.error('Erro ao configurar notificações:', error);
+            return false;
+        }
+    };
+
+    // Agendar lembrete diário
+    const scheduleDailyReminder = async () => {
+        try {
+            // Cancelar lembretes anteriores
+            await Notifications.cancelAllScheduledNotificationsAsync();
+
+            // Agendar lembrete diário às 20h
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: '💰 Lembrete Financeiro',
+                    body: 'Não esqueça de registrar seus gastos de hoje!',
+                    data: { type: 'daily-reminder' },
+                },
+                trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.DAILY,
+                    hour: 20,
+                    minute: 0,
+                    channelId: 'financial-alerts',
+                },
+            });
+
+            console.log('Lembrete diário agendado para 20:00');
+        } catch (error) {
+            console.error('Erro ao agendar lembrete:', error);
+        }
+    };
+
+    // Enviar notificação de alerta de orçamento
+    const sendBudgetAlert = async (percentage) => {
+        if (!notificationsEnabled) return;
+
+        try {
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: '⚠️ Alerta de Orçamento',
+                    body: `Você já gastou ${Math.round(percentage)}% do seu orçamento mensal!`,
+                    data: { type: 'budget-alert' },
+                },
+                trigger: null, // Enviar imediatamente
+            });
+        } catch (error) {
+            console.error('Erro ao enviar alerta:', error);
+        }
+    };
+
+    // --- Inicializar Banco de Dados e Notificações ---
     useEffect(() => {
         const initialize = async () => {
             await DB.initDatabase();
             await loadData();
             await checkForUpdates();
+
+            // Configurar notificações
+            const notifEnabled = await registerForPushNotificationsAsync();
+            if (notifEnabled) {
+                await scheduleDailyReminder();
+            }
         };
         initialize();
+
+        // Listener para notificações recebidas (app em foreground)
+        notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+            console.log('Notificação recebida:', notification);
+        });
+
+        // Listener para interações com notificações
+        responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+            const data = response.notification.request.content.data;
+            console.log('Usuário interagiu com notificação:', data);
+
+            // Navegar para a tela apropriada baseado no tipo
+            if (data.type === 'budget-alert') {
+                setActiveTab('dashboard');
+            }
+        });
+
+        return () => {
+            if (notificationListener.current) {
+                Notifications.removeNotificationSubscription(notificationListener.current);
+            }
+            if (responseListener.current) {
+                Notifications.removeNotificationSubscription(responseListener.current);
+            }
+        };
     }, []);
 
     // --- Verificar Atualizações ---
@@ -681,6 +810,67 @@ export default function App() {
                             >
                                 <Ionicons name="refresh-outline" size={20} color="#fff" />
                                 <Text style={styles.updateButtonText}>Verificar Atualizações</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Configurações de Notificações */}
+                        <View style={styles.card}>
+                            <View style={styles.cardHeader}>
+                                <Ionicons name="notifications-outline" size={16} color="#6366F1" />
+                                <Text style={styles.cardTitle}>Notificações</Text>
+                            </View>
+                            <Text style={styles.configSubtitle}>
+                                {notificationsEnabled
+                                    ? '✅ Notificações ativadas. Você receberá lembretes diários às 20h.'
+                                    : '❌ Notificações desativadas. Ative para receber lembretes.'
+                                }
+                            </Text>
+
+                            <View style={styles.notificationButtonsRow}>
+                                <TouchableOpacity
+                                    style={[styles.notificationButton, { backgroundColor: '#10B981' }]}
+                                    onPress={async () => {
+                                        const enabled = await registerForPushNotificationsAsync();
+                                        if (enabled) {
+                                            await scheduleDailyReminder();
+                                            Alert.alert('✅ Notificações Ativadas', 'Você receberá lembretes diários às 20h.');
+                                        } else {
+                                            Alert.alert('Permissão Negada', 'Vá nas configurações do dispositivo para ativar notificações.');
+                                        }
+                                    }}
+                                >
+                                    <Ionicons name="notifications" size={18} color="#fff" />
+                                    <Text style={styles.notificationButtonText}>Ativar</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.notificationButton, { backgroundColor: '#EF4444' }]}
+                                    onPress={async () => {
+                                        await Notifications.cancelAllScheduledNotificationsAsync();
+                                        setNotificationsEnabled(false);
+                                        Alert.alert('🔕 Notificações Desativadas', 'Você não receberá mais lembretes.');
+                                    }}
+                                >
+                                    <Ionicons name="notifications-off" size={18} color="#fff" />
+                                    <Text style={styles.notificationButtonText}>Desativar</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <TouchableOpacity
+                                style={[styles.updateButton, { marginTop: 12, backgroundColor: '#8B5CF6' }]}
+                                onPress={async () => {
+                                    await Notifications.scheduleNotificationAsync({
+                                        content: {
+                                            title: '🔔 Teste de Notificação',
+                                            body: 'As notificações estão funcionando corretamente!',
+                                        },
+                                        trigger: null,
+                                    });
+                                    Alert.alert('Enviado!', 'Uma notificação de teste foi enviada.');
+                                }}
+                            >
+                                <Ionicons name="send-outline" size={20} color="#fff" />
+                                <Text style={styles.updateButtonText}>Testar Notificação</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -1450,6 +1640,26 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    notificationButtonsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 12,
+        marginTop: 12,
+    },
+    notificationButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: 6,
+    },
+    notificationButtonText: {
+        color: '#FFF',
+        fontSize: 14,
+        fontWeight: '600',
     },
     tabBar: {
         position: 'absolute',

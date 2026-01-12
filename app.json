@@ -39,7 +39,14 @@
     },
     "plugins": [
       "expo-sqlite",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/Money.png",
+          "color": "#4F46E5"
+        }
+      ]
     ],
     "extra": {
       "eas": {

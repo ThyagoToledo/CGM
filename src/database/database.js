@@ -195,14 +195,14 @@ export const getExpensesByPeriod = async (period = 'month') => {
         SELECT SUM(amount) as total 
         FROM transactions 
         WHERE type = 'expense' 
-        AND date(date) = date('now')
+        AND date(date) = date('now', 'localtime')
       `;
         } else if (period === 'month') {
             query = `
         SELECT SUM(amount) as total 
         FROM transactions 
         WHERE type = 'expense' 
-        AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')
+        AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now', 'localtime')
       `;
         }
 
@@ -222,7 +222,7 @@ export const getExpensesByCategory = async () => {
       SELECT category, SUM(amount) as total
       FROM transactions
       WHERE type = 'expense'
-      AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')
+      AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now', 'localtime')
       GROUP BY category
       ORDER BY total DESC
     `);
