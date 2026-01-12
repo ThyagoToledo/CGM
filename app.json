@@ -4,10 +4,10 @@
     "slug": "financias-mobile",
     "version": "1.0.5",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/Money.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/Money.png",
       "resizeMode": "contain",
       "backgroundColor": "#4F46E5"
     },
@@ -20,13 +20,13 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/Money.png",
         "backgroundColor": "#4F46E5"
       },
       "package": "com.financias.app"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/Money.png"
     },
     "updates": {
       "enabled": true,
